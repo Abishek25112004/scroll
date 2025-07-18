@@ -451,47 +451,89 @@
         }
 
         function analyzeFrame(data) {
-            // Simple algorithm to detect finger pointing
             const width = canvas.width;
             const height = canvas.height;
             const centerX = width / 2;
             
-            // Analyze upper and lower regions for finger detection
-            let upperRegionActivity = 0;
-            let lowerRegionActivity = 0;
+            // More sensitive detection zones
+            const zoneWidth = 120; // Wider detection area
+            const zoneHeight = height / 4; // Quarter of screen height
             
-            // Check upper third of image
-            for (let y = 0; y < height / 3; y++) {
-                for (let x = centerX - 80; x < centerX + 80; x++) {
+            // Define detection zones
+            const upperZone = { startY: 0, endY: zoneHeight };
+            const lowerZone = { startY: height - zoneHeight, endY: height };
+            
+            let upperDetection = 0;
+            let lowerDetection = 0;
+            
+            // Analyze upper zone with better skin tone detection
+            for (let y = upperZone.startY; y < upperZone.endY; y++) {
+                for (let x = centerX - zoneWidth/2; x < centerX + zoneWidth/2; x++) {
                     if (x >= 0 && x < width) {
                         const idx = (y * width + x) * 4;
-                        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-                        if (brightness > 120) upperRegionActivity++;
+                        const r = data[idx];
+                        const g = data[idx + 1];
+                        const b = data[idx + 2];
+                        
+                        // Better skin tone detection
+                        if (isSkinTone(r, g, b)) {
+                            upperDetection++;
+                        }
                     }
                 }
             }
             
-            // Check lower third of image
-            for (let y = (height * 2) / 3; y < height; y++) {
-                for (let x = centerX - 80; x < centerX + 80; x++) {
+            // Analyze lower zone
+            for (let y = lowerZone.startY; y < lowerZone.endY; y++) {
+                for (let x = centerX - zoneWidth/2; x < centerX + zoneWidth/2; x++) {
                     if (x >= 0 && x < width) {
                         const idx = (y * width + x) * 4;
-                        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-                        if (brightness > 120) lowerRegionActivity++;
+                        const r = data[idx];
+                        const g = data[idx + 1];
+                        const b = data[idx + 2];
+                        
+                        if (isSkinTone(r, g, b)) {
+                            lowerDetection++;
+                        }
                     }
                 }
             }
             
-            // Determine gesture based on activity
-            const threshold = 500; // Minimum activity to register a gesture
+            // Lower threshold for easier detection
+            const threshold = 150;
+            const ratio = 1.5; // Less strict ratio
             
-            if (upperRegionActivity > threshold && upperRegionActivity > lowerRegionActivity * 1.3) {
+            if (upperDetection > threshold && upperDetection > lowerDetection * ratio) {
                 return 'up';
-            } else if (lowerRegionActivity > threshold && lowerRegionActivity > upperRegionActivity * 1.3) {
+            } else if (lowerDetection > threshold && lowerDetection > upperDetection * ratio) {
                 return 'down';
             } else {
                 return 'none';
             }
+        }
+        
+        // Helper function to detect skin tones
+        function isSkinTone(r, g, b) {
+            // Multiple skin tone ranges
+            const conditions = [
+                // Light skin
+                (r > 95 && g > 40 && b > 20 && 
+                 Math.max(r, g, b) - Math.min(r, g, b) > 15 && 
+                 Math.abs(r - g) > 15 && r > g && r > b),
+                
+                // Medium skin
+                (r > 80 && g > 50 && b > 30 &&
+                 r > g && g > b && r - b > 20),
+                
+                // Dark skin
+                (r > 60 && g > 40 && b > 25 &&
+                 r > g && r > b && g > b),
+                
+                // General brightness check
+                (r + g + b > 200 && r > 80 && g > 60 && b > 40)
+            ];
+            
+            return conditions.some(condition => condition);
         }
 
         function handleGesture(gesture) {
@@ -519,26 +561,50 @@
         }
 
         function startScrolling(direction) {
-            const scrollAmount = sensitivity * 40 * direction;
+            const scrollAmount = sensitivity * 60 * direction; // Increased scroll amount
             
             scrollInterval = setInterval(() => {
                 // Scroll the current page
                 window.scrollBy(0, scrollAmount);
                 
-                // Try to scroll other elements that might be focused
+                // Try to scroll focused elements
                 const activeElement = document.activeElement;
                 if (activeElement && activeElement.scrollTop !== undefined) {
                     activeElement.scrollTop += scrollAmount;
                 }
                 
-                // Simulate scroll events that other applications can detect
-                window.dispatchEvent(new WheelEvent('wheel', {
-                    deltaY: scrollAmount,
-                    bubbles: true,
-                    cancelable: true
-                }));
+                // Try to scroll the body and document
+                if (document.body) {
+                    document.body.scrollTop += scrollAmount;
+                }
+                if (document.documentElement) {
+                    document.documentElement.scrollTop += scrollAmount;
+                }
                 
-            }, 60); // Smooth scrolling every 60ms
+                // Simulate mouse wheel events for better compatibility
+                const wheelEvent = new WheelEvent('wheel', {
+                    deltaY: scrollAmount,
+                    deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                
+                // Dispatch to multiple targets
+                document.dispatchEvent(wheelEvent);
+                window.dispatchEvent(wheelEvent);
+                
+                // Also try keyboard events for some applications
+                if (Math.abs(scrollAmount) > 0) {
+                    const keyEvent = new KeyboardEvent('keydown', {
+                        key: direction > 0 ? 'ArrowDown' : 'ArrowUp',
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    document.dispatchEvent(keyEvent);
+                }
+                
+            }, 50); // Faster updates for smoother scrolling
         }
 
         // Initialize on page load

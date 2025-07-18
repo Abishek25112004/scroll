@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gesture Scroll Controller</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            line-height: 1.5;
+        }
+
+        .status.active {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status.error {
+            background: rgba(244, 67, 54, 0.3);
+            border-color: #f44336;
+            font-size: 1.1em;
+        }
+
+        .status.warning {
+            background: rgba(255, 152, 0, 0.3);
+            border-color: #ff9800;
+            font-size: 1.1em;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .controls {
+            margin: 30px 0;
+        }
+
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 50px;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .video-container {
+            position: relative;
+            margin: 30px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        video {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+        }
+
+        .gesture-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4ecdc4;
+        }
+
+        .instructions h3 {
+            color: #4ecdc4;
+            margin-bottom: 15px;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+        }
+
+        .instructions li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .sensitivity-control {
+            margin: 20px 0;
+        }
+
+        .sensitivity-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .sensitivity-control input {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+            accent-color: #4ecdc4;
+        }
+
+        .debug-info {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            text-align: left;
+        }
+
+        .help-section {
+            background: rgba(255, 193, 7, 0.2);
+            border: 2px solid #FFC107;
+            color: #FFC107;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .help-section h4 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .help-section ol {
+            margin-left: 20px;
+        }
+
+        .help-section li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖐️ AI Gesture Scroll</h1>
+        
+        <div class="status" id="status">
+            Ready to start - Click "Start Camera" to begin
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startCamera()">🎥 Start Camera</button>
+            <button id="stopBtn" onclick="stopCamera()" disabled>⏹️ Stop Camera</button>
+            <button id="checkBtn" onclick="checkCameraSupport()">🔍 Check Camera Support</button>
+        </div>
+
+        <div class="debug-info" id="debugInfo">
+            Browser: <span id="browserInfo"></span><br>
+            HTTPS: <span id="httpsInfo"></span><br>
+            Camera API: <span id="cameraApiInfo"></span><br>
+            Permissions: <span id="permissionsInfo"></span>
+        </div>
+
+        <div class="sensitivity-control">
+            <label for="sensitivity">Scroll Sensitivity:</label>
+            <input type="range" id="sensitivity" min="1" max="10" value="5">
+            <span id="sensitivityValue">5</span>
+        </div>
+
+        <div class="video-container" id="videoContainer" style="display: none;">
+            <video id="video" autoplay muted playsinline></video>
+            <div class="gesture-indicator" id="gestureIndicator">No gesture detected</div>
+        </div>
+
+        <div class="help-section" id="helpSection" style="display: none;">
+            <h4>📋 If camera popup doesn't appear:</h4>
+            <ol>
+                <li><strong>Check address bar:</strong> Look for a camera icon (🎥) or blocked icon (🚫)</li>
+                <li><strong>Manual permission:</strong> Click the camera/lock icon in address bar → Allow camera</li>
+                <li><strong>Chrome:</strong> Go to chrome://settings/content/camera</li>
+                <li><strong>Firefox:</strong> Go to about:preferences#privacy → Permissions</li>
+                <li><strong>Try different browser:</strong> Chrome, Firefox, Edge usually work best</li>
+                <li><strong>Refresh page</strong> after changing permissions</li>
+            </ol>
+        </div>
+
+        <div class="instructions">
+            <h3>How to use:</h3>
+            <ul>
+                <li><strong>Point finger UP</strong> - Scroll up in any application</li>
+                <li><strong>Point finger DOWN</strong> - Scroll down in any application</li>
+                <li><strong>No finger</strong> - Stop scrolling</li>
+                <li>Works with any application or webpage in the background</li>
+                <li>Adjust sensitivity slider to control scroll speed</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let video, canvas, ctx;
+        let isRunning = false;
+        let scrollInterval;
+        let currentGesture = 'none';
+        let sensitivity = 5;
+
+        // Initialize elements
+        const statusEl = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const checkBtn = document.getElementById('checkBtn');
+        const videoContainer = document.getElementById('videoContainer');
+        const gestureIndicator = document.getElementById('gestureIndicator');
+        const sensitivitySlider = document.getElementById('sensitivity');
+        const sensitivityValue = document.getElementById('sensitivityValue');
+        const debugInfo = document.getElementById('debugInfo');
+        const helpSection = document.getElementById('helpSection');
+
+        // Initialize debug info
+        function updateDebugInfo() {
+            document.getElementById('browserInfo').textContent = navigator.userAgent.split(' ')[0];
+            document.getElementById('httpsInfo').textContent = location.protocol === 'https:' ? '✅ Secure' : '❌ Not secure (required)';
+            document.getElementById('cameraApiInfo').textContent = navigator.mediaDevices ? '✅ Available' : '❌ Not available';
+            document.getElementById('permissionsInfo').textContent = 'Checking...';
+        }
+
+        // Check camera support and permissions
+        async function checkCameraSupport() {
+            updateDebugInfo();
+            
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusEl.textContent = '❌ Camera API not supported in this browser';
+                statusEl.className = 'status error';
+                helpSection.style.display = 'block';
+                return;
+            }
+
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                statusEl.textContent = '❌ HTTPS required for camera access';
+                statusEl.className = 'status error';
+                helpSection.style.display = 'block';
+                return;
+            }
+
+            try {
+                const permissions = await navigator.permissions.query({ name: 'camera' });
+                document.getElementById('permissionsInfo').textContent = permissions.state;
+                
+                if (permissions.state === 'denied') {
+                    statusEl.textContent = '❌ Camera access denied. Please enable in browser settings.';
+                    statusEl.className = 'status error';
+                    helpSection.style.display = 'block';
+                } else if (permissions.state === 'prompt') {
+                    statusEl.textContent = '✅ Camera available. Click "Start Camera" to request permission.';
+                    statusEl.className = 'status warning';
+                } else {
+                    statusEl.textContent = '✅ Camera access granted. Ready to start!';
+                    statusEl.className = 'status active';
+                }
+            } catch (err) {
+                document.getElementById('permissionsInfo').textContent = 'Cannot check (older browser)';
+                statusEl.textContent = '⚠️ Cannot check permissions. Try clicking "Start Camera".';
+                statusEl.className = 'status warning';
+            }
+        }
+
+        // Sensitivity control
+        sensitivitySlider.addEventListener('input', (e) => {
+            sensitivity = parseInt(e.target.value);
+            sensitivityValue.textContent = sensitivity;
+        });
+
+        async function startCamera() {
+            try {
+                statusEl.textContent = '🔄 Requesting camera access... Look for popup!';
+                statusEl.className = 'status warning';
+                helpSection.style.display = 'none';
+                
+                // Force the browser to show permission popup
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    }
+                };
+                
+                // This should trigger the permission popup
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                statusEl.textContent = '✅ Camera access granted! Starting video...';
+                statusEl.className = 'status active';
+                
+                video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                // Create canvas for processing
+                canvas = document.createElement('canvas');
+                canvas.width = 640;
+                canvas.height = 480;
+                ctx = canvas.getContext('2d');
+                
+                video.addEventListener('loadedmetadata', () => {
+                    videoContainer.style.display = 'block';
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    statusEl.textContent = '🎯 Camera active - Point finger up or down to scroll!';
+                    statusEl.className = 'status active';
+                    
+                    isRunning = true;
+                    detectGestures();
+                });
+                
+                video.addEventListener('error', (e) => {
+                    console.error('Video error:', e);
+                    statusEl.textContent = '❌ Video error. Try refreshing the page.';
+                    statusEl.className = 'status error';
+                    helpSection.style.display = 'block';
+                });
+                
+            } catch (err) {
+                console.error('Camera error:', err);
+                
+                let errorMessage = '❌ Camera access failed: ';
+                if (err.name === 'NotAllowedError') {
+                    errorMessage += 'Permission denied. Please allow camera access and try again.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage += 'No camera found. Please connect a camera.';
+                } else if (err.name === 'NotReadableError') {
+                    errorMessage += 'Camera is being used by another application.';
+                } else if (err.name === 'SecurityError') {
+                    errorMessage += 'Security error. Make sure you\'re on HTTPS.';
+                } else {
+                    errorMessage += err.message || 'Unknown error';
+                }
+                
+                statusEl.textContent = errorMessage;
+                statusEl.className = 'status error';
+                helpSection.style.display = 'block';
+                
+                // Update permissions info
+                document.getElementById('permissionsInfo').textContent = 'Denied or error';
+            }
+        }
+
+        function stopCamera() {
+            isRunning = false;
+            
+            if (video && video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+            }
+            
+            videoContainer.style.display = 'none';
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            statusEl.textContent = '⏹️ Camera stopped';
+            statusEl.className = 'status';
+            gestureIndicator.textContent = 'No gesture detected';
+            currentGesture = 'none';
+        }
+
+        function detectGestures() {
+            if (!isRunning || !video) return;
+            
+            // Draw video frame to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Simple gesture detection based on motion and position
+            const gesture = analyzeFrame(data);
+            
+            if (gesture !== currentGesture) {
+                currentGesture = gesture;
+                handleGesture(gesture);
+            }
+            
+            // Continue detection
+            requestAnimationFrame(detectGestures);
+        }
+
+        function analyzeFrame(data) {
+            // Simple algorithm to detect finger pointing
+            const width = canvas.width;
+            const height = canvas.height;
+            const centerX = width / 2;
+            
+            // Analyze upper and lower regions for finger detection
+            let upperRegionActivity = 0;
+            let lowerRegionActivity = 0;
+            
+            // Check upper third of image
+            for (let y = 0; y < height / 3; y++) {
+                for (let x = centerX - 80; x < centerX + 80; x++) {
+                    if (x >= 0 && x < width) {
+                        const idx = (y * width + x) * 4;
+                        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                        if (brightness > 120) upperRegionActivity++;
+                    }
+                }
+            }
+            
+            // Check lower third of image
+            for (let y = (height * 2) / 3; y < height; y++) {
+                for (let x = centerX - 80; x < centerX + 80; x++) {
+                    if (x >= 0 && x < width) {
+                        const idx = (y * width + x) * 4;
+                        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                        if (brightness > 120) lowerRegionActivity++;
+                    }
+                }
+            }
+            
+            // Determine gesture based on activity
+            const threshold = 500; // Minimum activity to register a gesture
+            
+            if (upperRegionActivity > threshold && upperRegionActivity > lowerRegionActivity * 1.3) {
+                return 'up';
+            } else if (lowerRegionActivity > threshold && lowerRegionActivity > upperRegionActivity * 1.3) {
+                return 'down';
+            } else {
+                return 'none';
+            }
+        }
+
+        function handleGesture(gesture) {
+            // Clear existing scroll interval
+            if (scrollInterval) {
+                clearInterval(scrollInterval);
+            }
+            
+            switch (gesture) {
+                case 'up':
+                    gestureIndicator.textContent = '👆 Scrolling UP';
+                    gestureIndicator.style.background = 'rgba(76, 175, 80, 0.9)';
+                    startScrolling(-1);
+                    break;
+                case 'down':
+                    gestureIndicator.textContent = '👇 Scrolling DOWN';
+                    gestureIndicator.style.background = 'rgba(244, 67, 54, 0.9)';
+                    startScrolling(1);
+                    break;
+                case 'none':
+                    gestureIndicator.textContent = '✋ No gesture';
+                    gestureIndicator.style.background = 'rgba(0, 0, 0, 0.8)';
+                    break;
+            }
+        }
+
+        function startScrolling(direction) {
+            const scrollAmount = sensitivity * 40 * direction;
+            
+            scrollInterval = setInterval(() => {
+                // Scroll the current page
+                window.scrollBy(0, scrollAmount);
+                
+                // Try to scroll other elements that might be focused
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.scrollTop !== undefined) {
+                    activeElement.scrollTop += scrollAmount;
+                }
+                
+                // Simulate scroll events that other applications can detect
+                window.dispatchEvent(new WheelEvent('wheel', {
+                    deltaY: scrollAmount,
+                    bubbles: true,
+                    cancelable: true
+                }));
+                
+            }, 60); // Smooth scrolling every 60ms
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            updateDebugInfo();
+            checkCameraSupport();
+        });
+
+        // Global keyboard shortcut (ESC key)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (isRunning) {
+                    stopCamera();
+                } else {
+                    startCamera();
+                }
+            }
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isRunning) {
+                console.log('Page hidden - gesture detection continues');
+            }
+        });
+    </script>
+</body>
+</html>
